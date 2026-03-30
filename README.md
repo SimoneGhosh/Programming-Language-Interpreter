@@ -1,4 +1,4 @@
-# 🐒 Monkey Language Interpreter
+# Monkey Language Interpreter
 
 > Building a programming language from scratch in Go — following *Writing an Interpreter in Go* by Thorsten Ball
 
