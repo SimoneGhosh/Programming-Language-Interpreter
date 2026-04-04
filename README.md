@@ -55,6 +55,11 @@ You're in the REPL! Write your code :)
 ## Run the tests
 ```bash
 go test ./lexer
+
+```
+
+```See how it works
+go test -v -run TestOperatorPrecedenceParsing ./parser
 ```
 
 ---
