@@ -69,3 +69,6 @@ go test -v -run TestOperatorPrecedenceParsing ./parser
 - **Language:** Go
 - **Concepts:** Lexing, parsing, AST construction, tree-walking evaluation
 - **Reference:** *Writing an Interpreter in Go* — Thorsten Ball
+
+define AST nodes, write tests, make tests pass by
+writing parsing code, celebrate
