@@ -21,6 +21,19 @@ const (
 	CALL                   //7 fn(x)
 )
 
+// Precedence table
+// associates token types with their precedence.
+var precedences = map[token.TokenType]int{
+	token.EQ:       EQUALS,
+	token.NOT_EQ:   EQUALS,
+	token.LT:       LESSGREATER,
+	token.GT:       LESSGREATER,
+	token.PLUS:     SUM,
+	token.MINUS:    SUM,
+	token.SLASH:    PRODUCT,
+	token.ASTERISK: PRODUCT,
+}
+
 // Implementing the Pratt Parser
 // Whenever this token type is encountered, the parsing functions are called to parse the appropriate expression and return an AST node that represents it
 // Each token type can have up to two parsing functions associated
@@ -46,11 +59,23 @@ func New(l *lexer.Lexer) *Parser {
 		errors: []string{},
 	}
 
+	//register prefix parse functions
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+
+	//register one infix parse function for all of  infix operators
+	p.infixParseFns = make(map[token.TokenType]infixParseFn)
+	p.registerInfix(token.PLUS, p.parseInfixExpression)
+	p.registerInfix(token.MINUS, p.parseInfixExpression)
+	p.registerInfix(token.SLASH, p.parseInfixExpression)
+	p.registerInfix(token.ASTERISK, p.parseInfixExpression)
+	p.registerInfix(token.EQ, p.parseInfixExpression)
+	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
+	p.registerInfix(token.LT, p.parseInfixExpression)
+	p.registerInfix(token.GT, p.parseInfixExpression)
 
 	// Read two tokens, so curToken and peekToken are both set
 	p.nextToken()
@@ -76,6 +101,26 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 	return expression
 }
 
+// parseInfixExpression parses an infix expression.
+// takes an argument, an ast.Expression called left. It uses this argument to construct an
+// *ast.InfixExpression node, with left being in the Left field. Then it assigns the precedence of
+// the current token (which is the operator of the infix expression) to the local variable precedence,
+// before advancing the tokens by calling nextToken and filling the Right field of the node with
+// another call to parseExpression - this time passing in the precedence of the operator token.
+func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
+	expression := &ast.InfixExpression{
+		Token:    p.curToken,
+		Operator: p.curToken.Literal,
+		Left:     left,
+	}
+
+	precedence := p.curPrecedence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
+
+	return expression
+}
+
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
@@ -97,6 +142,26 @@ func (p *Parser) expectPeek(t token.TokenType) bool {
 		p.peekError(t)
 		return false
 	}
+}
+
+// CHECKING FOR PRECEDENCE
+// returns the precedence associated with the token type ofp.peekToken.
+// If it doesn’t find a precedence for p.peekToken it defaults to LOWEST
+func (p *Parser) peekPrecedence() int {
+	if p, ok := precedences[p.peekToken.Type]; ok {
+		return p
+	}
+
+	return LOWEST
+}
+
+// returns precedence for current token
+func (p *Parser) curPrecedence() int {
+	if p, ok := precedences[p.curToken.Type]; ok {
+		return p
+	}
+
+	return LOWEST
 }
 
 // Errors
@@ -141,6 +206,7 @@ func (p *Parser) parseStatement() ast.Statement {
 	}
 }
 
+// PRATT PARSER
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	prefix := p.prefixParseFns[p.curToken.Type]
 	if prefix == nil {
@@ -148,6 +214,20 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 		return nil
 	}
 	leftExp := prefix()
+
+	//In the loop’s body the method tries to find infixParseFns for the next token.
+	//If it finds such a function, it calls it, passing in the expression returned by a prefixParseFn as an argument.
+	//And it does all this again and again until it encounters a token that has a higher precedence.
+	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExp
+		}
+
+		p.nextToken()
+
+		leftExp = infix(leftExp)
+	}
 
 	return leftExp
 }
