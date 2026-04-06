@@ -1,3 +1,4 @@
+// Converts strings --> tokens
 package lexer
 
 import "monkey/token"
@@ -9,13 +10,15 @@ type Lexer struct {
 	ch           byte // current char under examination
 }
 
-// New creates a new lexer for the given input
+// New creates a new lexer for the given input and initializes
 func New(input string) *Lexer {
 	l := &Lexer{input: input}
-	l.readChar()
+	l.readChar() // Read first char
 	return l
 }
 
+// NextToken reads the current character and returns a Token
+// It skips whitespace and handles multi-character tokens like "==" or "!="
 func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
 
@@ -65,7 +68,9 @@ func (l *Lexer) NextToken() token.Token {
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
+
 	// set the Literal field of our current token
+	// could be a letter or digit
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()
@@ -90,6 +95,7 @@ func (l *Lexer) skipWhitespace() {
 	}
 }
 
+// newToken is a helper that creates a token from a single character
 func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
 }
@@ -107,6 +113,7 @@ func (l *Lexer) readChar() {
 }
 
 // looks ahead and most of the time it only returns the immediately next character
+// does NOT move forward
 func (l *Lexer) peekChar() byte {
 	if l.readPosition >= len(l.input) {
 		return 0
@@ -116,6 +123,7 @@ func (l *Lexer) peekChar() byte {
 }
 
 // reads in an identifier and advances our lexer’s positions until it encounters a non-letter-character
+// for var names or keywords
 func (l *Lexer) readIdentifier() string {
 	position := l.position
 	for isLetter(l.ch) {
@@ -124,6 +132,7 @@ func (l *Lexer) readIdentifier() string {
 	return l.input[position:l.position]
 }
 
+// readNumber reads a sequence of digits and returns it as a string
 func (l *Lexer) readNumber() string {
 	position := l.position
 	for isDigit(l.ch) {
@@ -132,10 +141,12 @@ func (l *Lexer) readNumber() string {
 	return l.input[position:l.position]
 }
 
+// isLetter checks if a character is a letter (a-z, A-Z) or underscore
 func isLetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
 }
 
+// isDigit checks if a character is a digit (0-9)
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }

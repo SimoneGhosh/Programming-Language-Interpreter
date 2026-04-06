@@ -1,3 +1,8 @@
+// TOKENS --> AST
+
+// This is the Pratt Parser approach to parsing expressions
+// The key insight: each token type can have parsing functions associated with it
+// When we encounter that token, we use those functions to parse the expression
 package parser
 
 import (
@@ -43,6 +48,7 @@ type (
 	infixParseFn  func(ast.Expression) ast.Expression
 )
 
+// Parser takes a stream of tokens from the Lexer and builds an AST
 type Parser struct {
 	l      *lexer.Lexer //pointer to an instance of the lexer
 	errors []string
@@ -50,18 +56,22 @@ type Parser struct {
 	curToken  token.Token
 	peekToken token.Token
 
+	// Maps that store which parsing function to call for each token type
 	prefixParseFns map[token.TokenType]prefixParseFn
 	infixParseFns  map[token.TokenType]infixParseFn
 }
 
+// New creates a new parser and sets it up to parse
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		l:      l,
 		errors: []string{},
 	}
 
-	//register prefix parse functions
+	// Create maps to store parsing functions
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
+
+	//register prefix parse functions
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
 	p.registerPrefix(token.INT, p.parseIntegerLiteral)
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
@@ -102,13 +112,16 @@ func New(l *lexer.Lexer) *Parser {
 	return p
 }
 
+// Creates an Identifier AST node with the token and its value
 func (p *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 }
 
+// This handles operators that come BEFORE a value
 func (p *Parser) parsePrefixExpression() ast.Expression {
 	defer untrace(trace("parsePrefixExpression"))
 
+	// Create a PrefixExpression node to hold the operator and the thing it operates on
 	expression := &ast.PrefixExpression{
 		Token:    p.curToken,
 		Operator: p.curToken.Literal,
@@ -116,6 +129,8 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 
 	p.nextToken()
 
+	// Recursively parse the right side with high precedence (PREFIX)
+	// -5*2 --? (-5)*2
 	expression.Right = p.parseExpression(PREFIX)
 
 	return expression
@@ -130,15 +145,17 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	defer untrace(trace("parseInfixExpression"))
 
+	// Create an InfixExpression node to hold both sides and the operator
 	expression := &ast.InfixExpression{
 		Token:    p.curToken,
 		Operator: p.curToken.Literal,
 		Left:     left,
 	}
 
+	// Get the precedence of this operator
 	precedence := p.curPrecedence()
 	p.nextToken()
-	expression.Right = p.parseExpression(precedence)
+	expression.Right = p.parseExpression(precedence) //pass in the operator's precedence so operations with equal or lower precedence stop here
 
 	return expression
 }
@@ -152,8 +169,10 @@ func (p *Parser) parseBoolean() ast.Expression {
 func (p *Parser) parseGroupedExpression() ast.Expression {
 	p.nextToken()
 
+	// Parse the expression inside the parentheses with LOWEST precedence
 	exp := p.parseExpression(LOWEST)
 
+	// Make sure there's a closing parenthesis ")"
 	if !p.expectPeek(token.RPAREN) {
 		return nil
 	}
@@ -162,6 +181,7 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 }
 
 // parse if expression
+// (<condition>) { <consequence> } else { <alternative> }
 func (p *Parser) parseIfExpression() ast.Expression {
 	expression := &ast.IfExpression{Token: p.curToken}
 
@@ -194,6 +214,7 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	return expression
 }
 
+// This handles a block of statements surrounded by { }
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	block := &ast.BlockStatement{Token: p.curToken}
 	block.Statements = []ast.Statement{}
@@ -211,6 +232,7 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	return block
 }
 
+// This handles function definitions like: fn(x, y) { return x + y; }
 func (p *Parser) parseFunctionLiteral() ast.Expression {
 	lit := &ast.FunctionLiteral{Token: p.curToken}
 
@@ -320,7 +342,10 @@ func (p *Parser) noPrefixParseFnError(t token.TokenType) {
 	p.errors = append(p.errors, msg)
 }
 
+// This is the main entry point - it parses an entire program
+// It keeps parsing statements until it hits the end of file (EOF)
 func (p *Parser) ParseProgram() *ast.Program {
+	// Create an empty Program node
 	program := &ast.Program{}
 	program.Statements = []ast.Statement{}
 
@@ -335,6 +360,8 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
+// This decides what KIND of statement
+// and calls the appropriate parsing function
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.LET:
@@ -347,27 +374,59 @@ func (p *Parser) parseStatement() ast.Statement {
 }
 
 // PRATT PARSER
+// It uses precedence to decide how to combine operations
+//
+// How it works:
+// 1. Find and call the prefix parsing function for the current token
+// 2. Use that result as the left side
+// 3. While the next token has higher precedence:
+//   - Call the infix parsing function for that token
+//   - Use the result as the new left side
+//
+// 4. When we hit a lower-precedence token, stop and return
+//
+// Example: parsing "5 + 3 * 2" with precedence 0
+// - Parse 5 (prefix) -> leftExp = 5
+// - See +, check precedence 4 > 0, so continue
+// - Parse + (infix) with left=5 -> leftExp = (5 + ...)
+// - Parse 3 * 2 with precedence 4
+//   - Parse 3 (prefix) -> leftExp = 3
+//   - See *, check precedence 5 > 4, so continue
+//   - Parse * (infix) -> leftExp = (3 * 2)
+//   - No more tokens with precedence > 4, stop
+//
+// - Combine: (5 + (3 * 2)) = (5 + 6) = 11
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	defer untrace(trace("parseExpression"))
 
+	// Find the prefix parsing function for the current token
 	prefix := p.prefixParseFns[p.curToken.Type]
+
+	// If there's no prefix function, we can't parse this as an expression
 	if prefix == nil {
 		p.noPrefixParseFnError(p.curToken.Type)
 		return nil
 	}
+
+	// Call the prefix function to parse the left side
 	leftExp := prefix()
 
 	//In the loop’s body the method tries to find infixParseFns for the next token.
 	//If it finds such a function, it calls it, passing in the expression returned by a prefixParseFn as an argument.
 	//And it does all this again and again until it encounters a token that has a higher precedence.
 	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
+		// Try to find an infix parsing function for the next token
 		infix := p.infixParseFns[p.peekToken.Type]
+
+		// If there's no infix function, we can't continue
 		if infix == nil {
 			return leftExp
 		}
 
 		p.nextToken()
 
+		// Call the infix function, passing the left side we built so far
+		// It will build the right side and combine them
 		leftExp = infix(leftExp)
 	}
 
@@ -388,6 +447,7 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	return stmt
 }
 
+// <identifier> = <expression>
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	stmt := &ast.LetStatement{Token: p.curToken}
 

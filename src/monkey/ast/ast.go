@@ -1,3 +1,4 @@
+// Package ast defines all the different types of nodes in our Abstract Syntax Tree
 package ast
 
 import (
@@ -6,21 +7,26 @@ import (
 	"strings"
 )
 
+// Node is the base interface for every node in the AST
+// Every piece of code is a node, and every node must be able to return its token
 type Node interface {
 	TokenLiteral() string //TokenLiteral() only for debugging/testing
 	String() string
 }
 
+// They don't produce values; they perform actions
 type Statement interface {
 	Node
 	statementNode()
 }
 
+// They produce values
 type Expression interface {
 	Node
 	expressionNode()
 }
 
+// It contains all the statements in the entire source file
 type Program struct { // Program node in root node of every AST
 	Statements []Statement
 }

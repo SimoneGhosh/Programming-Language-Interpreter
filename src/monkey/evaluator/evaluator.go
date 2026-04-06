@@ -1,3 +1,4 @@
+// Takes AST and runs it
 package evaluator
 
 import (
@@ -6,12 +7,14 @@ import (
 	"monkey/object"
 )
 
+// Objects that get reused instead of creating new ones
 var (
 	NULL  = &object.Null{}
 	TRUE  = &object.Boolean{Value: true}
 	FALSE = &object.Boolean{Value: false}
 )
 
+// Takes an AST node and an environment and returns what code evaluates to
 func Eval(node ast.Node, env *object.Environment) object.Object {
 	switch node := node.(type) {
 
@@ -25,6 +28,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	case *ast.BlockStatement:
 		return evalBlockStatement(node, env)
 
+	// Evaluate what is being returned at wrap it
 	case *ast.ReturnStatement:
 		val := Eval(node.ReturnValue, env)
 		if isError(val) {
@@ -32,6 +36,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		}
 		return &object.ReturnValue{Value: val}
 
+	// store var in environment
 	case *ast.LetStatement:
 		val := Eval(node.Value, env)
 		if isError(val) {
@@ -69,6 +74,7 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 
 		return evalInfixExpression(node.Operator, left, right)
 
+	// Decide which branch to take
 	case *ast.IfExpression:
 		return evalIfExpression(node, env)
 
@@ -94,6 +100,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 	return nil
 }
 
+// evalProgram evaluates every statement in the program, one by one
+// If any statement returns early (like with "return"), stop and return that value
 func evalProgram(program *ast.Program, env *object.Environment) object.Object {
 	var result object.Object
 
@@ -125,6 +133,7 @@ func evalStatements(stmts []ast.Statement, env *object.Environment) object.Objec
 	return result
 }
 
+// evalBlockStatement evaluates all statements in a block (like the inside of an if statement)
 func evalBlockStatement(block *ast.BlockStatement, env *object.Environment) object.Object {
 	var result object.Object
 	for _, statement := range block.Statements {
@@ -140,6 +149,8 @@ func evalBlockStatement(block *ast.BlockStatement, env *object.Environment) obje
 	return result
 }
 
+// nativeBoolToBooleanObject converts Go's native bool (true/false)
+// into our interpreter's Boolean object, using our cached TRUE/FALSE
 func nativeBoolToBooleanObject(input bool) *object.Boolean {
 	if input {
 		return TRUE
@@ -147,6 +158,7 @@ func nativeBoolToBooleanObject(input bool) *object.Boolean {
 	return FALSE
 }
 
+// evalPrefixExpression handles operators that come BEFORE a value
 func evalPrefixExpression(operator string, right object.Object) object.Object {
 	switch operator {
 	case "!":
@@ -159,6 +171,7 @@ func evalPrefixExpression(operator string, right object.Object) object.Object {
 	}
 }
 
+// evalBangOperatorExpression handles the ! (NOT) operator
 func evalBangOperatorExpression(right object.Object) object.Object {
 	switch right {
 	case TRUE:
@@ -172,6 +185,7 @@ func evalBangOperatorExpression(right object.Object) object.Object {
 	}
 }
 
+// evalMinusPrefixOperatorExpression handles the - (negate) operator
 func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
 	if right.Type() != object.INTEGER_OBJ {
 		return newError("unknown operator: -%s", right.Type())
@@ -181,6 +195,7 @@ func evalMinusPrefixOperatorExpression(right object.Object) object.Object {
 	return &object.Integer{Value: -value}
 }
 
+// evalInfixExpression handles operators that go BETWEEN two values
 func evalInfixExpression(
 	operator string,
 	left, right object.Object,
@@ -203,6 +218,7 @@ func evalInfixExpression(
 	}
 }
 
+// evalIntegerInfixExpression handles math operations on two numbers
 func evalIntegerInfixExpression(
 	operator string,
 	left, right object.Object,
@@ -235,6 +251,8 @@ func evalIntegerInfixExpression(
 	}
 }
 
+// It evaluates the condition, and if it's truthy, runs the consequence (true branch)
+// Otherwise, it runs the alternative (false branch) if it exists
 func evalIfExpression(ie *ast.IfExpression, env *object.Environment) object.Object {
 	condition := Eval(ie.Condition, env)
 
@@ -251,6 +269,8 @@ func evalIfExpression(ie *ast.IfExpression, env *object.Environment) object.Obje
 	}
 }
 
+// evalIdentifier looks up a variable by name in the environment
+// If found, returns its value. If not found, returns an error.
 func evalIdentifier(
 	node *ast.Identifier,
 	env *object.Environment,
@@ -262,6 +282,8 @@ func evalIdentifier(
 	return val
 }
 
+// evalExpressions evaluates a list of expressions
+// Used when evaluating function arguments
 func evalExpressions(
 	exps []ast.Expression,
 	env *object.Environment,
@@ -320,6 +342,7 @@ func unwrapReturnValue(obj object.Object) object.Object {
 	return obj
 }
 
+// isTruthy determines if something should be treated as true or false
 func isTruthy(obj object.Object) bool {
 	switch obj {
 	case NULL:
@@ -333,10 +356,12 @@ func isTruthy(obj object.Object) bool {
 	}
 }
 
+// newError creates a new error object with a formatted message
 func newError(format string, a ...interface{}) *object.Error {
 	return &object.Error{Message: fmt.Sprintf(format, a...)}
 }
 
+// isError checks if something is an error object
 func isError(obj object.Object) bool {
 	if obj != nil {
 		return obj.Type() == object.ERROR_OBJ

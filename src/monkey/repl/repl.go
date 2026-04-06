@@ -1,3 +1,4 @@
+// (Read-Eval-Print Loop)
 package repl
 
 import (
@@ -16,19 +17,19 @@ const PROMPT = ">>"
 // The output of the parser, an *ast.Program, is then printed by calling its
 // String method, which recursively calls the String method of all statements belonging to that program.
 func Start(in io.Reader, out io.Writer) {
-	scanner := bufio.NewScanner(in)
-	env := object.NewEnvironment()
+	scanner := bufio.NewScanner(in) // read from the input
+	env := object.NewEnvironment()  // store statements
 
 	for {
 		fmt.Printf(PROMPT)
 		scanned := scanner.Scan()
 		if !scanned {
-			return
+			return // exit
 		}
 
 		line := scanner.Text()
-		l := lexer.New(line)
-		p := parser.New(l)
+		l := lexer.New(line) // create lexer - string -> token
+		p := parser.New(l)   // create parser - token -> AST
 
 		program := p.ParseProgram()
 		if len(p.Errors()) != 0 {
@@ -36,7 +37,7 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		evaluated := evaluator.Eval(program, env)
+		evaluated := evaluator.Eval(program, env) // run parsed code
 		if evaluated != nil {
 			io.WriteString(out, evaluated.Inspect())
 			io.WriteString(out, "\n")

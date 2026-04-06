@@ -1,10 +1,13 @@
 // Defining Tokens - data structures
-
 package token
 
 // Defining as string = many diff value = know different types of token
-// Easy to debug
 type TokenType string
+
+type Token struct {
+	Type    TokenType
+	Literal string
+}
 
 // Define tokenTypes = limit # of token type
 const (
@@ -48,11 +51,8 @@ const (
 	RETURN   = "RETURN"
 )
 
-type Token struct {
-	Type    TokenType
-	Literal string
-}
-
+// keywords is a map that associates keyword strings with their token types
+// keywords vs identifiers
 var keywords = map[string]TokenType{
 	"fn":     FUNCTION,
 	"let":    LET,
