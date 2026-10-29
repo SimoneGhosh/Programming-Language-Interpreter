@@ -1,14 +1,13 @@
-# Monkey Language Interpreter
+Monkey Language Interpreter
 
 > Building a programming language from scratch in Go — following *Writing an Interpreter in Go* by Thorsten Ball
 
 ---
 
-## What is this?
+What is this?
 
-This is a hand-rolled interpreter for **Monkey**, a C-like scripting language, built entirely from scratch in Go — no parser generators, no libraries. Every component is implemented manually: the lexer, the token system, the parser, and the REPL.
-
-This project is about understanding what happens *under the hood* when code runs — turning raw text into something a machine can execute, one character at a time.
+An interpreter for a C-like programming language from scratch with a lexer, a parser and an Abstract Syntax Tree (AST). With Pratt parsing technique and a recursive descent parser. 
+A project for myself to learn about how compilers work! To learn What closures are and how and why they work, what are built-in data structures, and What REPL stands for and how to build one
 
 ---
 
@@ -38,37 +37,4 @@ Monkey supports:
 
 ---
 
-## Try it yourself
-```bash
-cd Programming-Language-Interpreter/lexing/src/monkey
-go run main.go
-```
-```
-You're in the REPL! Write your code :)
->> let add = fn(x, y) { x + y; };
->> add(5, 10)
-15
-```
-
 ---
-
-## Run the tests
-```bash
-go test ./lexer
-
-```
-
-```See how it works
-go test -v -run TestOperatorPrecedenceParsing ./parser
-```
-
----
-
-## Tech
-
-- **Language:** Go
-- **Concepts:** Lexing, parsing, AST construction, tree-walking evaluation
-- **Reference:** *Writing an Interpreter in Go* — Thorsten Ball
-
-define AST nodes, write tests, make tests pass by
-writing parsing code, celebrate
