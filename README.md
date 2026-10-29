@@ -8,7 +8,7 @@ A project for myself to learn about how compilers work! To learn What closures a
 
 ---
 
-## How it works
+How it works
 ```
 Source Code (string)
        ↓
@@ -22,8 +22,6 @@ Source Code (string)
 ```
 
 ---
-
-## The Monkey Language
 
 Monkey supports:
 
